@@ -10,6 +10,7 @@
 #ifdef PLATFORM_WIIU
 
 #define SYMBOLS_FONT "content:/NerdFontsSymbolsOnly/SymbolsNerdFont-Regular.ttf"
+#define LUCIDE_FONT "content:/lucide.ttf"
 #define AMBIANCE_PATH "content:/cafebgdemo.mp3"
 
 #define BASE_PATH_RAW "/vol/external01/wiiu/apps/cafemp/"

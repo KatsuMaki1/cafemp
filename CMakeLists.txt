@@ -69,6 +69,7 @@ set(SRC_FILES
   src/animesama/text_utils.cpp
   src/animesama/resolvers.cpp
   src/animesama/animesama.cpp
+  src/youtube/youtube.cpp
   src/settings/settings.cpp
   src/player/media_player.cpp
   src/player/photo_viewer.cpp
@@ -79,6 +80,7 @@ set(SRC_FILES
   src/ui/scene.cpp
 
   src/ui/scenes/scene_anime_sama.cpp
+  src/ui/scenes/scene_youtube.cpp
   src/ui/scenes/scene_main_menu.cpp
   src/ui/scenes/scene_media_player.cpp
   src/ui/scenes/scene_file_browser.cpp

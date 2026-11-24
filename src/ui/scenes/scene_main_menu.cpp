@@ -14,14 +14,11 @@ void scene_main_menu_render() {
     ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoTitleBar;
 
     if (ImGui::Begin(VERSION_STRING, nullptr, window_flags)) {
-        ImGui::Columns(2, nullptr, false);
-
-        ImGui::SetColumnWidth(0, WIDGET_SIDEBAR_WIDTH);
-        widget_sidebar_render();
-
-        ImGui::NextColumn();
+        widget_sidebar_begin_layout();
 
         if (ImGui::BeginChild("Content", ImVec2(0, 0), true)) {
+            widget_sidebar_toggle_button();
+            ImGui::SameLine();
             ImGui::Text("Welcome to %s!", VERSION_STRING);
             ImGui::Separator();
 
@@ -30,7 +27,9 @@ void scene_main_menu_render() {
             ImGui::TextUnformatted("What's New");
             ImGui::Spacing();
 
-            ImGui::BulletText("Hardware video decoding for H.264 Baseline (720p @ 30 FPS)");
+            ImGui::BulletText("Anime-Sama streaming (VOSTFR / VF, HLS & MP4)");
+            ImGui::BulletText("YouTube search & playback (InnerTube)");
+            ImGui::BulletText("Hardware video decoding for H.264 (up to 1080p60)");
             ImGui::BulletText("General stability improvements");
             ImGui::BulletText("PDF and EPUB reader");
             ImGui::BulletText("Wiimote support");
@@ -43,7 +42,7 @@ void scene_main_menu_render() {
         }
 
         ImGui::EndChild();
-        ImGui::Columns(1);
+        widget_sidebar_end_layout();
     }
 
     ImGui::End();

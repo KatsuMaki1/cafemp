@@ -20,6 +20,7 @@ struct Request {
     std::string range;                // e.g. "0-1023" (without "bytes=")
     bool follow_redirects = true;
     long timeout_s = 15;              // total timeout, 0 = none (streams use a low-speed limit instead)
+    std::string post_body;            // non-empty -> HTTP POST
 };
 
 struct Response {

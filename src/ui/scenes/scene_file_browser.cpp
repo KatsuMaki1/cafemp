@@ -182,7 +182,10 @@ void scene_file_browser_go_up() {
 
 void scene_file_browser_input() {
     if (input_pressed(BUTTON_B)) {
-        scene_file_browser_go_up();
+        if (relative_dir.empty())
+            widget_sidebar_toggle();
+        else
+            scene_file_browser_go_up();
     }
 }
 
@@ -193,12 +196,13 @@ void scene_file_browser_render() {
         ImGui::SetWindowPos(ImVec2(0, 0));
         ImGui::SetWindowSize(ImVec2(display_get().width, display_get().height - TOOLTIP_BAR_HEIGHT));
 
-        ImGui::Columns(2, nullptr, false);
-        ImGui::SetColumnWidth(0, WIDGET_SIDEBAR_WIDTH);
-        widget_sidebar_render();
-        ImGui::NextColumn();
+        widget_sidebar_begin_layout();
 
         ImGui::BeginChild("FileList", ImVec2(0, 0), true, ImGuiWindowFlags_None);
+        widget_sidebar_toggle_button();
+        ImGui::SameLine();
+        ImGui::Text("%s%s", media_root.c_str(), relative_dir.c_str());
+        ImGui::Separator();
 
         for (const file &f : files) {
             if (widget_button_icon(f.path.c_str(), file_icons.at(f.file_type), false, ImVec2(-1, 64))) {
@@ -215,7 +219,7 @@ void scene_file_browser_render() {
         }
 
         ImGui::EndChild();
-        ImGui::Columns(1);
+        widget_sidebar_end_layout();
         ImGui::End();
     }
 

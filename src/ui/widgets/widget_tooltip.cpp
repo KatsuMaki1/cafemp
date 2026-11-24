@@ -19,6 +19,7 @@ void widget_tooltip_render() {
                 break;
             case STATE_MENU_FILES:
             case STATE_ANIME_SAMA:
+            case STATE_YOUTUBE:
                 ImGui::Text("%s Select | %s Open | %s Back", FONT_GLYPH_LEFT_ANALOG_STICK, FONT_GLYPH_A_BUTTON, FONT_GLYPH_B_BUTTON);
                 break;
             case STATE_MENU_SETTINGS:

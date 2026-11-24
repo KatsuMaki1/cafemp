@@ -155,6 +155,11 @@ Response Session::perform(const Request &req, const DataCallback *on_data, const
 
     if (!req.range.empty())
         curl_easy_setopt(h, CURLOPT_RANGE, req.range.c_str());
+    if (!req.post_body.empty()) {
+        curl_easy_setopt(h, CURLOPT_POST, 1L);
+        curl_easy_setopt(h, CURLOPT_POSTFIELDS, req.post_body.c_str());
+        curl_easy_setopt(h, CURLOPT_POSTFIELDSIZE, (long)req.post_body.size());
+    }
 
     struct curl_slist *hdrs = nullptr;
     hdrs = curl_slist_append(hdrs, "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");

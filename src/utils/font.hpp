@@ -57,22 +57,36 @@ static const float default_font_size = 32;
 #define FONT_GLYPH_CLOSE_BUTTON "\uE071"
 #define FONT_GLYPH_UNUSED_CLOSE_BUTTON "\uE070"
 
-#define ICON_HOME "\uf015"
-#define ICON_VIDEO "\uf03d"
-#define ICON_AUDIO "\uf001"
-#define ICON_PHOTO "\uf03e"
-#define ICON_LIBRARY "\uf02d"
-#define ICON_SETTINGS "\uf013"
-#define ICON_FOLDER "\uf07b"
-#define ICON_USB "\uf287"
+// Lucide icons (loaded as a separate font so Wii U button glyphs at U+E000..E099 don't collide)
+#define ICON_HOME "\uE0F5"       // house
+#define ICON_VIDEO "\uE0D0"      // film
+#define ICON_AUDIO "\uE122"      // music
+#define ICON_PHOTO "\uE0F6"      // image
+#define ICON_LIBRARY "\uE05F"    // book-open
+#define ICON_SETTINGS "\uE154"   // settings
+#define ICON_FOLDER "\uE0D7"     // folder
+#define ICON_USB "\uE0ED"        // hard-drive
 
-#define ICON_PLAY "\uf04b"
-#define ICON_PAUSE "\uf04c"
-#define ICON_BUFFER "\uf017"
+#define ICON_PLAY "\uE13C"       // play
+#define ICON_PAUSE "\uE12E"      // pause
+#define ICON_BUFFER "\uE087"     // clock
 
-#define ICON_YOUTUBE "\uf16a"
-#define ICON_JELLYFIN "\uf26c"
-#define ICON_ANIME "\uf008"
+#define ICON_YOUTUBE "\uE195"    // tv
+#define ICON_JELLYFIN "\uE412"   // sparkles
+#define ICON_ANIME "\uE0D0"      // film
+#define ICON_SEARCH "\uE151"     // search
+#define ICON_MENU "\uE115"       // menu
+#define ICON_PANEL_OPEN "\uE21D" // panel-left-open
+#define ICON_PANEL_CLOSE "\uE21C"// panel-left-close
+#define ICON_BACK "\uE048"       // arrow-left
+#define ICON_LANG "\uE0FE"       // languages
+
+static const ImWchar lucide_ranges[] = {
+    0xE000, 0xEFFF,
+    0,
+};
+
+ImFont *font_lucide();
 
 static const ImWchar nerd_font_ranges[] = {
     0xE0A0, 0xE0A3,                 // Powerline
@@ -112,6 +126,10 @@ static void font_load(OSSharedDataType font, bool merge) {
     }
 }
 
+inline ImFont *g_lucide_font = nullptr;
+
+inline ImFont *font_lucide() { return g_lucide_font ? g_lucide_font : ImGui::GetFont(); }
+
 static void font_load_all() {
     font_load(OS_SHAREDDATATYPE_FONT_STANDARD, false);
     font_load(OS_SHAREDDATATYPE_FONT_CHINESE, true);
@@ -125,6 +143,12 @@ static void font_load_all() {
     cfg.GlyphMinAdvanceX = default_font_size;
 
     io.Fonts->AddFontFromFileTTF(SYMBOLS_FONT, default_font_size, &cfg, nerd_font_ranges);
+
+    ImFontConfig lcfg;
+    lcfg.MergeMode = false;
+    lcfg.PixelSnapH = true;
+    lcfg.GlyphMinAdvanceX = default_font_size;
+    g_lucide_font = io.Fonts->AddFontFromFileTTF(LUCIDE_FONT, default_font_size, &lcfg, lucide_ranges);
 }
 
 #endif

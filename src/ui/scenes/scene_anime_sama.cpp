@@ -5,6 +5,7 @@
 #include "logger/logger.hpp"
 #include "main.hpp"
 #include "ui/cover_cache.hpp"
+#include "ui/widgets/widget_button_icon.hpp"
 #include "ui/widgets/widget_sidebar.hpp"
 #include "ui/widgets/widget_tooltip.hpp"
 #include "utils/app_state.hpp"
@@ -183,22 +184,23 @@ bool poster_card(const char *id, const std::string &title, const std::string &co
     ImVec2 p1 = ImGui::GetItemRectMax();
     ImVec2 img_p1(p0.x + w, p0.y + h_img);
 
-    ImU32 card_bg = hovered ? IM_COL32(34, 40, 54, 255) : IM_COL32(22, 26, 36, 255);
+    ImU32 card_bg = hovered ? IM_COL32(42, 20, 26, 255) : IM_COL32(20, 14, 17, 255);
     dl->AddRectFilled(p0, p1, card_bg, 10.0f);
 
     ImTextureID tex = ui_covers::get(cover_url);
     if (tex) {
         dl->AddImageRounded(tex, p0, img_p1, ImVec2(0, 0), ImVec2(1, 1), IM_COL32(255, 255, 255, 255), 10.0f, ImDrawFlags_RoundCornersTop);
     } else {
-        dl->AddRectFilledMultiColor(p0, img_p1, IM_COL32(35, 45, 70, 255), IM_COL32(25, 32, 50, 255), IM_COL32(18, 22, 34, 255), IM_COL32(25, 30, 45, 255));
-        ImVec2 ic_sz = ImGui::CalcTextSize(ICON_ANIME);
-        dl->AddText(ImVec2(p0.x + (w - ic_sz.x) * 0.5f, p0.y + (h_img - ic_sz.y) * 0.5f), IM_COL32(120, 140, 180, 180), ICON_ANIME);
+        dl->AddRectFilledMultiColor(p0, img_p1, IM_COL32(48, 18, 24, 255), IM_COL32(28, 12, 16, 255), IM_COL32(14, 10, 12, 255), IM_COL32(24, 14, 18, 255));
+        ImFont *lf = font_lucide();
+        ImVec2 ic_sz = lf->CalcTextSizeA(32.0f, FLT_MAX, 0.0f, ICON_ANIME);
+        dl->AddText(lf, 32.0f, ImVec2(p0.x + (w - ic_sz.x) * 0.5f, p0.y + (h_img - ic_sz.y) * 0.5f), IM_COL32(220, 60, 75, 190), ICON_ANIME);
     }
 
     if (hovered) {
-        dl->AddRect(p0, p1, IM_COL32(96, 165, 250, 255), 10.0f, 0, 3.0f);
+        dl->AddRect(p0, p1, IM_COL32(239, 68, 68, 255), 10.0f, 0, 3.0f);
     } else {
-        dl->AddRect(p0, p1, IM_COL32(45, 52, 68, 160), 10.0f, 0, 1.0f);
+        dl->AddRect(p0, p1, IM_COL32(65, 30, 38, 160), 10.0f, 0, 1.0f);
     }
 
     ImVec2 txt_min(p0.x + 8.0f, img_p1.y + 6.0f);
@@ -211,15 +213,8 @@ bool poster_card(const char *id, const std::string &title, const std::string &co
     return clicked;
 }
 
-bool pill_button(const char *label, bool active, ImVec2 size = ImVec2(0, 42)) {
-    if (active) {
-        ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.23f, 0.51f, 0.96f, 1.00f));
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.32f, 0.58f, 0.98f, 1.00f));
-    }
-    bool clicked = ImGui::Button(label, size);
-    if (active)
-        ImGui::PopStyleColor(2);
-    return clicked;
+bool pill_button(const char *id, const char *icon, const char *label, bool active, ImVec2 size = ImVec2(0, 42)) {
+    return widget_lucide_button(id, icon, label, active, size);
 }
 
 } // namespace
@@ -266,10 +261,7 @@ void scene_anime_sama_render() {
         ImGui::SetWindowPos(ImVec2(0, 0));
         ImGui::SetWindowSize(ImVec2(display_get().width, display_get().height - TOOLTIP_BAR_HEIGHT));
 
-        ImGui::Columns(2, nullptr, false);
-        ImGui::SetColumnWidth(0, WIDGET_SIDEBAR_WIDTH);
-        widget_sidebar_render();
-        ImGui::NextColumn();
+        widget_sidebar_begin_layout();
 
         ImGui::BeginChild("AnimeSamaContent", ImVec2(0, 0), true, ImGuiWindowFlags_None);
 
@@ -284,10 +276,12 @@ void scene_anime_sama_render() {
         }
 
         if (page == Page::Search) {
+            widget_sidebar_toggle_button();
+            ImGui::SameLine();
             ImGui::Text("Anime-Sama");
             ImGui::SameLine(ImGui::GetContentRegionAvail().x - 160.0f);
             ImGui::BeginDisabled(busy);
-            if (pill_button(S.lang == animesama::Lang::VOSTFR ? "VOSTFR" : "VF", true, ImVec2(140.0f, 38.0f))) {
+            if (pill_button("lang_top", ICON_LANG, S.lang == animesama::Lang::VOSTFR ? "VOSTFR" : "VF", true, ImVec2(140.0f, 38.0f))) {
                 S.lang = (S.lang == animesama::Lang::VOSTFR) ? animesama::Lang::VF : animesama::Lang::VOSTFR;
             }
             ImGui::EndDisabled();
@@ -299,7 +293,7 @@ void scene_anime_sama_render() {
             ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - 200.0f);
             bool submit = ImGui::InputTextWithHint("##anime_query", "Rechercher un anime (ex: Frieren, One Piece)...", S.query, sizeof(S.query), ImGuiInputTextFlags_EnterReturnsTrue);
             ImGui::SameLine();
-            if (pill_button("Rechercher", true, ImVec2(180.0f, 44.0f)) || submit) {
+            if (pill_button("as_search", ICON_SEARCH, "Rechercher", true, ImVec2(180.0f, 44.0f)) || submit) {
                 start_search();
             }
             ImGui::PopStyleVar();
@@ -353,16 +347,18 @@ void scene_anime_sama_render() {
                 eps = S.episodes.episodes;
             }
 
+            widget_sidebar_toggle_button();
+            ImGui::SameLine();
             ImGui::BeginDisabled(busy);
-            if (pill_button("< Retour", false, ImVec2(140.0f, 40.0f)))
+            if (pill_button("as_back", ICON_BACK, "Retour", false, ImVec2(130.0f, 40.0f)))
                 go_back();
             ImGui::SameLine();
             bool is_vostfr = (S.lang == animesama::Lang::VOSTFR);
-            if (pill_button("VOSTFR", is_vostfr, ImVec2(120.0f, 40.0f)) && !is_vostfr && season_idx < (int)info.seasons.size()) {
+            if (pill_button("as_vostfr", ICON_LANG, "VOSTFR", is_vostfr, ImVec2(130.0f, 40.0f)) && !is_vostfr && season_idx < (int)info.seasons.size()) {
                 load_season_episodes(info.seasons[season_idx], animesama::Lang::VOSTFR);
             }
             ImGui::SameLine();
-            if (pill_button("VF", !is_vostfr, ImVec2(90.0f, 40.0f)) && is_vostfr && season_idx < (int)info.seasons.size()) {
+            if (pill_button("as_vf", ICON_LANG, "VF", !is_vostfr, ImVec2(95.0f, 40.0f)) && is_vostfr && season_idx < (int)info.seasons.size()) {
                 load_season_episodes(info.seasons[season_idx], animesama::Lang::VF);
             }
             ImGui::EndDisabled();
@@ -403,15 +399,15 @@ void scene_anime_sama_render() {
             for (size_t i = 0; i < info.seasons.size(); i++) {
                 if (i > 0)
                     ImGui::SameLine();
-                ImGui::PushID((int)i);
-                if (pill_button(info.seasons[i].name.c_str(), (int)i == season_idx, ImVec2(0, 40.0f))) {
+                char sid[32];
+                snprintf(sid, sizeof(sid), "season_%zu", i);
+                if (pill_button(sid, ICON_FOLDER, info.seasons[i].name.c_str(), (int)i == season_idx, ImVec2(0, 40.0f))) {
                     {
                         std::lock_guard<std::mutex> lk(S.mtx);
                         S.selected_season_idx = (int)i;
                     }
                     load_season_episodes(info.seasons[i], S.lang);
                 }
-                ImGui::PopID();
             }
             ImGui::EndDisabled();
 
@@ -433,19 +429,19 @@ void scene_anime_sama_render() {
                     if (i % cols != 0)
                         ImGui::SameLine(0.0f, gap);
                     char label[48];
-                    snprintf(label, sizeof(label), "%s  Episode %d", ICON_PLAY, eps[i].number);
-                    ImGui::PushID((int)i);
-                    if (ImGui::Button(label, ImVec2(btn_w, 52.0f))) {
+                    snprintf(label, sizeof(label), "Episode %d", eps[i].number);
+                    char eid[32];
+                    snprintf(eid, sizeof(eid), "ep_%zu", i);
+                    if (widget_lucide_button(eid, ICON_PLAY, label, false, ImVec2(btn_w, 52.0f))) {
                         play_episode(eps[i]);
                     }
-                    ImGui::PopID();
                 }
                 ImGui::EndDisabled();
             }
         }
 
         ImGui::EndChild();
-        ImGui::Columns(1);
+        widget_sidebar_end_layout();
         ImGui::End();
     }
 
