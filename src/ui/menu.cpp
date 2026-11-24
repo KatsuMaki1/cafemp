@@ -4,6 +4,7 @@
 #include "main.hpp"
 #include "player/media_player.hpp"
 #include "ui/scene.hpp"
+#include "ui/scenes/scene_anime_sama.hpp"
 #include "ui/scenes/scene_file_browser.hpp"
 #include "ui/scenes/scene_main_menu.hpp"
 #include "ui/scenes/scene_media_player.hpp"
@@ -148,6 +149,7 @@ void ui_init() {
 
     ui_scene_register(STATE_MENU, {[]() {}, []() {}, []() { scene_main_menu_render(); }, []() {}});
     ui_scene_register(STATE_MENU_FILES, {[]() {}, []() { scene_file_browser_input(); }, []() { scene_file_browser_render(); }, []() {}});
+    ui_scene_register(STATE_ANIME_SAMA, {[]() {}, []() { scene_anime_sama_input(); }, []() { scene_anime_sama_render(); }, []() {}});
 
     ui_scene_register(STATE_VIEWING_PHOTO, {[]() {
                                                 scene_photo_viewer_init(media_info_get()->path);
@@ -231,6 +233,7 @@ void ui_render() {
 }
 
 void ui_shutdown() {
+    scene_anime_sama_shutdown();
     input_shutdown();
 
     ui_handle_ambiance(false);

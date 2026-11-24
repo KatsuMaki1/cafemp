@@ -22,6 +22,7 @@ extern "C" {
 }
 
 #include "logger/logger.hpp"
+#include "net/http_avio.hpp"
 #include "nv12_shader.h"
 #include "player/media_player.hpp"
 #include "utils/display.hpp"
@@ -771,6 +772,7 @@ struct PlayerState {
     double max_frame_dur = 3600.0;
 
     std::atomic<bool> running{false};
+    std::atomic<bool> abort_req{false};
     std::atomic<bool> playing{false};
     std::atomic<bool> paused{true};
     bool force_refresh = false;
@@ -1513,9 +1515,11 @@ static bool init_audio_stream() {
     return true;
 }
 
-int media_player_init(const char *path_) {
-    std::string path = "file:" + std::string(path_); // Workaround for file path starting with video:/ or audio:/
-    log_message(LOG_DEBUG, MP, "media_player_init: %s", path);
+int media_player_init(const char *path_, const char *referer_) {
+    std::string raw_path = path_ ? path_ : "";
+    bool is_http = raw_path.compare(0, 7, "http://") == 0 || raw_path.compare(0, 8, "https://") == 0;
+    std::string path = is_http ? raw_path : ("file:" + raw_path); // Workaround for file path starting with video:/ or audio:/
+    log_message(LOG_DEBUG, MP, "media_player_init: %s", path.c_str());
     if (S) {
         log_message(LOG_WARNING, MP, "Re-init: cleaning up");
         media_player_cleanup();
@@ -1545,12 +1549,10 @@ int media_player_init(const char *path_) {
         return -1;
     }
 
-    {
-        int err = avformat_open_input(&S->fmt_ctx, path.c_str(), nullptr, nullptr);
-        if (err < 0) {
-            char buf[256]{};
-            av_strerror(err, buf, sizeof(buf));
-            log_message(LOG_ERROR, MP, "avformat_open_input: [%d] %s", err, buf);
+    if (is_http) {
+        std::string ref = referer_ ? referer_ : "";
+        if (!http::avio_attach(S->fmt_ctx, path, ref, &S->abort_req)) {
+            log_message(LOG_ERROR, MP, "http::avio_attach failed for %s", path.c_str());
             avformat_free_context(S->fmt_ctx);
             S->fmt_ctx = nullptr;
             delete S;
@@ -1559,12 +1561,25 @@ int media_player_init(const char *path_) {
         }
     }
 
-    S->fmt_ctx->probesize = 32 * 1024;
-    S->fmt_ctx->max_analyze_duration = AV_TIME_BASE / 2;
+    {
+        int err = avformat_open_input(&S->fmt_ctx, path.c_str(), nullptr, nullptr);
+        if (err < 0) {
+            char buf[256]{};
+            av_strerror(err, buf, sizeof(buf));
+            log_message(LOG_ERROR, MP, "avformat_open_input: [%d] %s", err, buf);
+            http::avio_close_input(&S->fmt_ctx);
+            delete S;
+            S = nullptr;
+            return -1;
+        }
+    }
+
+    S->fmt_ctx->probesize = is_http ? (256 * 1024) : (32 * 1024);
+    S->fmt_ctx->max_analyze_duration = is_http ? (3 * AV_TIME_BASE) : (AV_TIME_BASE / 2);
 
     if (avformat_find_stream_info(S->fmt_ctx, nullptr) < 0) {
         log_message(LOG_ERROR, MP, "avformat_find_stream_info failed");
-        avformat_close_input(&S->fmt_ctx);
+        http::avio_close_input(&S->fmt_ctx);
         delete S;
         S = nullptr;
         return -1;
@@ -1865,6 +1880,7 @@ void media_player_cleanup() {
     log_message(LOG_DEBUG, MP, "cleanup: dec=%d drp=%d clock=%.2f s", S->frames_decoded, S->frames_dropped, get_master_clock());
 
     S->running.store(false);
+    S->abort_req.store(true);
     S->playing.store(false);
     S->paused.store(true);
     pq_abort(&S->videoq);
@@ -1907,7 +1923,7 @@ void media_player_cleanup() {
     S->quad_vtx = nullptr;
 
     if (S->cur_frame_info) delete S->cur_frame_info;
-    if (S->fmt_ctx) avformat_close_input(&S->fmt_ctx);
+    if (S->fmt_ctx) http::avio_close_input(&S->fmt_ctx);
     if (SDL_WasInit(SDL_INIT_AUDIO)) SDL_QuitSubSystem(SDL_INIT_AUDIO);
     avformat_network_deinit();
 

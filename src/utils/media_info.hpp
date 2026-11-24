@@ -1,6 +1,8 @@
 #ifndef MADIA_INFO_HPP
 #define MADIA_INFO_HPP
 
+#include "utils/app_state.hpp"
+
 #include <cstdint>
 #include <memory>
 #include <string>
@@ -8,6 +10,8 @@
 struct media_info {
     std::string path = "";
     std::string filename = "";
+    std::string referer = "";
+    AppState return_state = STATE_MENU_FILES;
     char type = 'U';
     double framerate = 30.0;
     int64_t total_playback_time = 0;

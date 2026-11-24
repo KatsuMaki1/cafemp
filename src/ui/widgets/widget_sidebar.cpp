@@ -47,6 +47,10 @@ void widget_sidebar_render() {
     }
 #endif
 
+    if (widget_button_icon("Anime-Sama", ICON_ANIME, app_state_get() == STATE_ANIME_SAMA, size)) {
+        app_state_set(STATE_ANIME_SAMA);
+    }
+
 #ifdef DEBUG    
     if (widget_button_icon("YouTube", ICON_YOUTUBE, app_state_get() == STATE_MENU_SETTINGS, size)) {
     }

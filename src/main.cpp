@@ -1,6 +1,7 @@
 #include "main.hpp"
 
 #include "logger/logger.hpp"
+#include "net/http_client.hpp"
 #include "ui/menu.hpp"
 #include "utils/display.hpp"
 #include "utils/power_manager.hpp"
@@ -29,6 +30,7 @@ int main(void) {
 #endif
 
     display_init();
+    http::global_init();
     ui_init();
 
     while (WHBProcIsRunning()) {
@@ -36,6 +38,7 @@ int main(void) {
     }
 
     ui_shutdown();
+    http::global_cleanup();
 
 #ifndef PLATFORM_WIIU_LEGACY
     usb_unmount();

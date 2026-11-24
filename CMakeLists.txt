@@ -64,6 +64,11 @@ set(SRC_FILES
   src/input/devices/wpad.cpp
 
   src/logger/logger.cpp
+  src/net/http_client.cpp
+  src/net/http_avio.cpp
+  src/animesama/text_utils.cpp
+  src/animesama/resolvers.cpp
+  src/animesama/animesama.cpp
   src/settings/settings.cpp
   src/player/media_player.cpp
   src/player/photo_viewer.cpp
@@ -72,6 +77,7 @@ set(SRC_FILES
   src/ui/menu.cpp
   src/ui/scene.cpp
 
+  src/ui/scenes/scene_anime_sama.cpp
   src/ui/scenes/scene_main_menu.cpp
   src/ui/scenes/scene_media_player.cpp
   src/ui/scenes/scene_file_browser.cpp
@@ -142,6 +148,8 @@ target_compile_definitions(CafeMP PRIVATE
   __WIIU__
 )
 
+find_package(CURL REQUIRED)
+
 target_link_libraries(CafeMP
   mupdf
   mupdf-third
@@ -156,6 +164,7 @@ target_link_libraries(CafeMP
   avcodec
   avutil
   SDL2
+  CURL::libcurl
   $ENV{DEVKITPRO}/wut/usr/lib/libmocha.a
   m
   wut

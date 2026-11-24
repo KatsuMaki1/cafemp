@@ -20,14 +20,16 @@ static bool show_hud = false;
 ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoBackground;
 
 void scene_media_player_init(std::string full_path) {
-    if (media_info_get()->type == 'A') {
+    media_info *info = media_info_get();
+    if (info->type == 'A') {
         std::string cover_path = full_path.substr(0, full_path.find_last_of('/') + 1) + "folder.jpg";
 
         photo_viewer_init();
         photo_viewer_open_picture(cover_path.c_str());
     }
 
-    media_player_init(full_path.c_str());
+    const char *ref = info->referer.empty() ? nullptr : info->referer.c_str();
+    media_player_init(full_path.c_str(), ref);
     media_player_play(true);
 }
 
@@ -42,9 +44,10 @@ void scene_media_player_render() {
         photo_viewer_render();
     }
 
-    if (info->current_playback_time >= info->total_playback_time) {
+    if (info->total_playback_time > 0 && info->current_playback_time >= info->total_playback_time) {
+        AppState ret = info->return_state;
         media_player_cleanup();
-        app_state_set(STATE_MENU_FILES);
+        app_state_set(ret);
     }
 
     if (!info->playback_status || show_hud) {
@@ -57,8 +60,9 @@ void scene_media_player_input() {
         bool is_playing = media_info_get()->playback_status;
         media_player_play(!is_playing);
     } else if (input_pressed(BUTTON_B)) {
+        AppState ret = media_info_get()->return_state;
         media_player_cleanup();
-        app_state_set(STATE_MENU_FILES);
+        app_state_set(ret);
     } else if (input_pressed(BUTTON_LEFT)) {
         double current_time = media_player_get_current_time();
         media_player_seek(current_time - 5.0);

@@ -72,6 +72,7 @@ static const float default_font_size = 32;
 
 #define ICON_YOUTUBE "\uf16a"
 #define ICON_JELLYFIN "\uf26c"
+#define ICON_ANIME "\uf008"
 
 static const ImWchar nerd_font_ranges[] = {
     0xE0A0, 0xE0A3,                 // Powerline
