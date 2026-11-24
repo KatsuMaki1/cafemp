@@ -74,6 +74,7 @@ set(SRC_FILES
   src/player/photo_viewer.cpp
   src/player/pdf_viewer.cpp
 
+  src/ui/cover_cache.cpp
   src/ui/menu.cpp
   src/ui/scene.cpp
 

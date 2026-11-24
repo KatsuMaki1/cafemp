@@ -31,13 +31,27 @@ void set_base_url(const std::string &url) {
 
 static std::string bot_wall_msg(const std::string &where) { return "Cloudflare bloque l'acces a " + where + " depuis la console. Reessaie plus tard."; }
 
-static bool domain_is_online(http::Session &s, const std::string &domain) {
+static bool domain_is_online(http::Session &s, const std::string &domain, std::string &resolved_origin, std::string &last_err) {
     http::Request req;
     req.url = "https://" + domain;
-    req.follow_redirects = false;
+    req.follow_redirects = true;
     req.timeout_s = 6;
     http::Response r = s.get(req);
-    return r.error.empty() && r.status == 200;
+    if (!r.error.empty()) {
+        last_err = domain + ": " + r.error;
+        return false;
+    }
+    if (http::is_bot_wall(r)) {
+        last_err = domain + ": Cloudflare (" + std::to_string(r.status) + ")";
+        return false;
+    }
+    if (r.status == 200) {
+        std::string origin = txt::url_origin(r.effective_url);
+        resolved_origin = origin.empty() ? ("https://" + domain) : origin;
+        return true;
+    }
+    last_err = domain + ": HTTP " + std::to_string(r.status);
+    return false;
 }
 
 bool find_base_url(std::string &out, std::string &err) {
@@ -66,21 +80,23 @@ bool find_base_url(std::string &out, std::string &err) {
             p = end;
         }
     } else {
-        log_message(LOG_WARNING, AS, "Could not read domain list from %s (status %ld)", DOMAIN_LIST_URL, r.status);
+        log_message(LOG_WARNING, AS, "Could not read domain list from %s (status %ld, err=%s)", DOMAIN_LIST_URL, r.status, r.error.c_str());
     }
     for (const char *d : FALLBACK_DOMAINS)
         if (std::find(domains.begin(), domains.end(), d) == domains.end())
             domains.push_back(d);
 
+    std::string last_err;
     for (const std::string &d : domains) {
-        if (domain_is_online(s, d)) {
-            set_base_url("https://" + d);
-            out = "https://" + d;
+        std::string origin;
+        if (domain_is_online(s, d, origin, last_err)) {
+            set_base_url(origin);
+            out = origin;
             log_message(LOG_OK, AS, "Active domain: %s", out.c_str());
             return true;
         }
     }
-    err = "Impossible de trouver un domaine Anime-Sama actif (connexion internet ?)";
+    err = "Anime-Sama inaccessible (" + (last_err.empty() ? "connexion internet ?" : last_err) + ")";
     return false;
 }
 

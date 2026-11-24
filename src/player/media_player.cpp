@@ -1267,11 +1267,79 @@ static void audio_decode_thread() {
     log_message(LOG_DEBUG, MP, "Audio decode thread exiting");
 }
 
+// Validate H.264 NAL framing before feeding packets to h264_wiiu so truncated
+// network packets never wedge the hardware decoder.
+static bool h264_nal_valid(const uint8_t *data, size_t size) {
+    if (!size || (data[0] & 0x80))
+        return false;
+    int nal_type = data[0] & 0x1F;
+    return nal_type > 0 && nal_type < 24 && (size >= 2 || nal_type == 10 || nal_type == 11);
+}
+
+static size_t h264_start_code(const uint8_t *data, size_t size, size_t pos) {
+    if (pos + 3 <= size && data[pos] == 0 && data[pos + 1] == 0 && data[pos + 2] == 1)
+        return 3;
+    if (pos + 4 <= size && data[pos] == 0 && data[pos + 1] == 0 && data[pos + 2] == 0 && data[pos + 3] == 1)
+        return 4;
+    return 0;
+}
+
+static bool h264_packet_complete(const uint8_t *data, size_t size, int nal_len_size) {
+    if (!data || !size || nal_len_size < 0 || nal_len_size > 4)
+        return false;
+    if (nal_len_size > 0) {
+        size_t pos = 0;
+        int units = 0;
+        while (pos < size) {
+            if (size - pos < (size_t)nal_len_size)
+                return false;
+            uint32_t len = 0;
+            for (int i = 0; i < nal_len_size; i++)
+                len = (len << 8) | data[pos++];
+            if (len > size - pos || !h264_nal_valid(data + pos, len))
+                return false;
+            pos += len;
+            units++;
+        }
+        return units > 0;
+    }
+    size_t pos = 0;
+    while (pos < size && !h264_start_code(data, size, pos)) {
+        if (data[pos++] != 0)
+            return false;
+    }
+    int units = 0;
+    while (pos < size) {
+        size_t sc = h264_start_code(data, size, pos);
+        if (!sc)
+            return false;
+        size_t begin = pos + sc;
+        pos = begin;
+        while (pos < size && !h264_start_code(data, size, pos))
+            pos++;
+        size_t end = pos;
+        while (end > begin && data[end - 1] == 0)
+            end--;
+        if (!h264_nal_valid(data + begin, end - begin))
+            return false;
+        units++;
+    }
+    return units > 0;
+}
+
 static void read_thread() {
     log_message(LOG_DEBUG, MP, "Read thread started");
     PlayerState *ps = S;
     AVPacket *pkt = av_packet_alloc();
     int pkts_read = 0;
+    bool is_h264 = false;
+    int h264_nal_len = 0;
+    if (ps->video_idx >= 0) {
+        AVCodecParameters *vp = ps->fmt_ctx->streams[ps->video_idx]->codecpar;
+        is_h264 = (vp->codec_id == AV_CODEC_ID_H264);
+        if (is_h264 && vp->extradata_size >= 7 && vp->extradata && vp->extradata[0] == 1)
+            h264_nal_len = (vp->extradata[4] & 3) + 1;
+    }
 
     for (;;) {
         if (!ps->running.load(std::memory_order_relaxed)) break;
@@ -1352,6 +1420,11 @@ static void read_thread() {
         }
 
         ps->eof = false;
+        if ((pkt->flags & AV_PKT_FLAG_CORRUPT) || (pkt->stream_index == ps->video_idx && is_h264 && ps->hw_decoder && !h264_packet_complete(pkt->data, pkt->size > 0 ? (size_t)pkt->size : 0, h264_nal_len))) {
+            log_message(LOG_WARNING, MP, "Dropping damaged/incomplete video packet (%d bytes)", pkt->size);
+            av_packet_unref(pkt);
+            continue;
+        }
         pkts_read++;
         if (pkt->stream_index == ps->video_idx)
             pq_put(&ps->videoq, pkt);
@@ -1376,9 +1449,14 @@ static bool init_video_stream() {
     S->out_w = st->codecpar->width;
     S->out_h = st->codecpar->height;
 
-    const AVCodec *codec = avcodec_find_decoder(st->codecpar->codec_id);
+    AVCodecParameters *vp = st->codecpar;
+    const AVCodec *codec = nullptr;
 
-    if (st->codecpar->codec_id == AV_CODEC_ID_H264) {
+    // h264_wiiu only supports 8-bit 4:2:0 up to 1920x1088.
+    bool hw_eligible = (vp->codec_id == AV_CODEC_ID_H264) && (vp->width <= 1920 && vp->height <= 1088) && (vp->format != AV_PIX_FMT_YUV420P10LE) &&
+                       (vp->profile != FF_PROFILE_H264_HIGH_10) && (vp->profile != FF_PROFILE_H264_HIGH_422) && (vp->profile != FF_PROFILE_H264_HIGH_444_PREDICTIVE);
+
+    if (hw_eligible) {
         const AVCodec *hw = avcodec_find_decoder_by_name("h264_wiiu");
         if (hw) {
             codec = hw;
@@ -1386,29 +1464,54 @@ static bool init_video_stream() {
             log_message(LOG_OK, MP, "h264_wiiu HW decoder (%dx%d H.264)", S->out_w, S->out_h);
         }
     }
+    if (!codec) {
+        codec = (vp->codec_id == AV_CODEC_ID_H264) ? avcodec_find_decoder_by_name("h264") : avcodec_find_decoder(vp->codec_id);
+    }
 
     if (!codec) {
-        log_message(LOG_ERROR, MP, "No decoder for video codec %d", st->codecpar->codec_id);
+        log_message(LOG_ERROR, MP, "No decoder for video codec %d", vp->codec_id);
         return false;
     }
 
     AVCodecContext *avctx = avcodec_alloc_context3(codec);
-    if (!avctx || avcodec_parameters_to_context(avctx, st->codecpar) < 0) {
+    if (!avctx || avcodec_parameters_to_context(avctx, vp) < 0) {
         log_message(LOG_ERROR, MP, "Video codec context setup failed");
         avcodec_free_context(&avctx);
         return false;
     }
     avctx->pkt_timebase = st->time_base;
     if (!S->hw_decoder) {
-        avctx->thread_count = 2;
-        avctx->thread_type = FF_THREAD_SLICE;
+        avctx->thread_count = 3;
+        avctx->thread_type = FF_THREAD_SLICE | FF_THREAD_FRAME;
         avctx->flags2 |= AV_CODEC_FLAG2_FAST;
         avctx->skip_loop_filter = AVDISCARD_NONREF;
     }
     if (avcodec_open2(avctx, codec, nullptr) < 0) {
-        log_message(LOG_ERROR, MP, "avcodec_open2 failed for '%s'", codec->name);
+        log_message(LOG_WARNING, MP, "avcodec_open2 failed for '%s'", codec->name);
         avcodec_free_context(&avctx);
-        return false;
+        if (S->hw_decoder) {
+            S->hw_decoder = false;
+            codec = avcodec_find_decoder_by_name("h264");
+            if (!codec)
+                return false;
+            avctx = avcodec_alloc_context3(codec);
+            if (!avctx || avcodec_parameters_to_context(avctx, vp) < 0) {
+                avcodec_free_context(&avctx);
+                return false;
+            }
+            avctx->pkt_timebase = st->time_base;
+            avctx->thread_count = 3;
+            avctx->thread_type = FF_THREAD_SLICE | FF_THREAD_FRAME;
+            avctx->flags2 |= AV_CODEC_FLAG2_FAST;
+            avctx->skip_loop_filter = AVDISCARD_NONREF;
+            if (avcodec_open2(avctx, codec, nullptr) < 0) {
+                avcodec_free_context(&avctx);
+                return false;
+            }
+            log_message(LOG_OK, MP, "Fallback to SW h264 decoder");
+        } else {
+            return false;
+        }
     }
     S->video_avctx = avctx;
 
