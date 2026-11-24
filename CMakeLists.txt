@@ -148,8 +148,6 @@ target_compile_definitions(CafeMP PRIVATE
   __WIIU__
 )
 
-find_package(CURL REQUIRED)
-
 target_link_libraries(CafeMP
   mupdf
   mupdf-third
@@ -164,7 +162,11 @@ target_link_libraries(CafeMP
   avcodec
   avutil
   SDL2
-  CURL::libcurl
+  curl
+  mbedtls
+  mbedx509
+  mbedcrypto
+  z
   $ENV{DEVKITPRO}/wut/usr/lib/libmocha.a
   m
   wut
@@ -254,14 +256,21 @@ function(wut_create_wuhb_custom target)
   endforeach()
 
   if(WUHBTOOL_BOOTSOUND)
-    get_filename_component(bootsound "${WUHBTOOL_BOOTSOUND}" ABSOLUTE)
+    execute_process(
+      COMMAND "${WUT_WUHBTOOL_EXE}" --help
+      OUTPUT_VARIABLE WUHBTOOL_HELP
+      ERROR_VARIABLE WUHBTOOL_HELP
+    )
+    if(WUHBTOOL_HELP MATCHES "boot-sound")
+      get_filename_component(bootsound "${WUHBTOOL_BOOTSOUND}" ABSOLUTE)
 
-    if(NOT EXISTS "${bootsound}")
-      message(FATAL_ERROR "Boot sound not found: ${bootsound}")
+      if(NOT EXISTS "${bootsound}")
+        message(FATAL_ERROR "Boot sound not found: ${bootsound}")
+      endif()
+
+      list(APPEND args "--boot-sound=${bootsound}")
+      list(APPEND deps "${bootsound}")
     endif()
-
-    list(APPEND args "--boot-sound=${bootsound}")
-    list(APPEND deps "${bootsound}")
   endif()
 
   add_custom_command(

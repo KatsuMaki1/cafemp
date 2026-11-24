@@ -289,14 +289,13 @@ static int custom_io_open(AVFormatContext *s, AVIOContext **pb, const char *url,
     return 0;
 }
 
-static int custom_io_close2(AVFormatContext *, AVIOContext *pb) {
+static void custom_io_close(AVFormatContext *, AVIOContext *pb) {
     if (!pb)
-        return 0;
+        return;
     CurlStream *cs = static_cast<CurlStream *>(pb->opaque);
     delete cs;
     av_freep(&pb->buffer);
     avio_context_free(&pb);
-    return 0;
 }
 
 bool avio_attach(AVFormatContext *fmt_ctx, const std::string &url, const std::string &referer, const std::atomic<bool> *abort_flag) {
@@ -306,7 +305,7 @@ bool avio_attach(AVFormatContext *fmt_ctx, const std::string &url, const std::st
     IoContextData *data = new IoContextData{referer, abort_flag};
     fmt_ctx->opaque = data;
     fmt_ctx->io_open = custom_io_open;
-    fmt_ctx->io_close2 = custom_io_close2;
+    fmt_ctx->io_close = custom_io_close;
     fmt_ctx->flags |= AVFMT_FLAG_CUSTOM_IO;
 
     AVIOContext *pb = open_curl_avio(url, referer, abort_flag);
@@ -314,7 +313,7 @@ bool avio_attach(AVFormatContext *fmt_ctx, const std::string &url, const std::st
         delete data;
         fmt_ctx->opaque = nullptr;
         fmt_ctx->io_open = nullptr;
-        fmt_ctx->io_close2 = nullptr;
+        fmt_ctx->io_close = nullptr;
         fmt_ctx->flags &= ~AVFMT_FLAG_CUSTOM_IO;
         return false;
     }
@@ -334,7 +333,7 @@ void avio_close_input(AVFormatContext **fmt_ctx_ptr) {
 
     if (custom) {
         if (pb)
-            custom_io_close2(nullptr, pb);
+            custom_io_close(nullptr, pb);
         delete data;
     }
 }
